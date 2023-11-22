@@ -1,0 +1,56 @@
+import os
+import base64
+import json
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from github import Github
+
+# Set up Gmail API credentials
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+creds = None
+
+if os.path.exists('gmail_token.json'):
+    creds = Credentials.from_authorized_user_file('gmail_token.json', SCOPES)
+
+if not creds or not creds.valid:
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    else:
+        flow = InstalledAppFlow.from_client_secrets_file(
+            'credentials.json', SCOPES)
+        creds = flow.run_local_server(port=0)
+    with open('gmail_token.json', 'w') as token:
+        token.write(creds.to_json())
+
+# Set up GitHub API credentials
+github_token = "YOUR_GITHUB_TOKEN"
+g = Github(github_token)
+
+# Retrieve emails from Gmail
+from googleapiclient.discovery import build
+service = build('gmail', 'v1', credentials=creds)
+
+results = service.users().messages().list(userId='me', labelIds=['INBOX']).execute()
+emails = results.get('messages', [])
+
+# Write emails to GitHub repository
+repo_owner = "YOUR_GITHUB_USERNAME"
+repo_name = "YOUR_GITHUB_REPOSITORY_NAME"
+repo = g.get_repo(f"{repo_owner}/{repo_name}")
+
+for email in emails:
+    msg = service.users().messages().get(userId='me', id=email['id']).execute()
+    email_data = msg['payload']['headers']
+
+    # Extract email content (subject and body) as text
+    subject = [x['value'] for x in email_data if x['name'] == 'Subject'][0]
+    body = base64.urlsafe_b64decode(msg['payload']['body']['data']).decode('utf-8')
+
+    # Create a markdown file with the email content
+    file_content = f"# {subject}\n\n{body}"
+    file_name = f"{subject.lower().replace(' ', '_')}.md"
+
+    repo.create_file(file_name, "commit message", file_content)
+
+print("Emails have been successfully written to GitHub repository!")
