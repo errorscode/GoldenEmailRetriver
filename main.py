@@ -6,7 +6,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from github import Github
 
-# Set up Gmail API credentials
+# Set up Gmail API credentials 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 creds = None
 
